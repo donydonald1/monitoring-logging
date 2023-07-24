@@ -1,0 +1,144 @@
+additionalPrometheusRulesMap: {}
+alertmanager:
+  alertmanagerSpec:
+    # configSecret: prometheus-msteams-webhook
+    clusterAdvertiseAddress: false
+    forceEnableClusterMode: true
+    replicas: 3
+  config:
+    global:
+      resolve_timeout: 1m
+      slack_api_url: 'https://hooks.slack.com/services/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'
+    inhibit_rules:
+      - equal:
+          - namespace
+          - alertname
+        source_matchers:
+          - severity = critical
+        target_matchers:
+          - severity =~ warning|info
+      - equal:
+          - namespace
+          - alertname
+        source_matchers:
+          - severity = warning
+        target_matchers:
+          - severity = info
+      - equal:
+          - namespace
+        source_matchers:
+          - alertname = InfoInhibitor
+        target_matchers:
+          - severity = info
+    receivers:
+      - name: 'null'
+
+      - name: 'msteam-warning'
+        webhook_configs:
+          - send_resolved: true
+            url: http://prometheus-msteams:2000/alertmanager-warning
+      - name: 'msteam-critical'
+        webhook_configs:
+          - send_resolved: true
+            url: http://prometheus-msteams:2000/alertmanager-critical
+      - name: 'teams-instance-1'
+        webhook_configs:
+          - send_resolved: true
+            url: http://rancher-alerting-drivers-prom2teams:8089/teams-instance-1
+      - name: 'slack-notifications'
+        slack_configs:
+        - channel: '#monitoring-instances'
+          send_resolved: true
+          icon_url: https://avatars3.githubusercontent.com/u/3380462
+          title: |-
+            [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }} for {{ .CommonLabels.job }}
+            {{- if gt (len .CommonLabels) (len .GroupLabels) -}}
+              {{" "}}(
+              {{- with .CommonLabels.Remove .GroupLabels.Names }}
+                {{- range $index, $label := .SortedPairs -}}
+                  {{ if $index }}, {{ end }}
+                  {{- $label.Name }}="{{ $label.Value -}}"
+                {{- end }}
+              {{- end -}}
+              )
+            {{- end }}
+          text: >-
+            {{ range .Alerts -}}
+            *Alert:* {{ .Annotations.title }}{{ if .Labels.severity }} - `{{ .Labels.severity }}`{{ end }}
+            *Description:* {{ .Annotations.description }}
+            *Details:*
+              {{ range .Labels.SortedPairs }} • *{{ .Name }}:* `{{ .Value }}`
+              {{ end }}
+            {{ end }}
+    route:
+      group_by:
+        - namespace
+        - job
+      group_interval: 30s
+      group_wait: 30s
+      receiver: 'null'
+      repeat_interval: 30s
+      routes:
+        - matchers:
+            - alertname =~ "InfoInhibitor|Watchdog"
+          receiver: 'null'
+        - matchers:
+            - alertname =~ "InfoInhibitor|Watchdog"
+          receiver: 'msteam-warning'
+        - matchers:
+            - alertname =~ "InfoInhibitor|Watchdog"
+          receiver: 'msteam-critical'
+        - receiver: 'msteam-critical'
+          match:
+            severity: 'critical'
+        - receiver: 'msteam-warning'
+          match:
+            severity: 'warning'
+        - receiver: 'teams-instance-1'
+          match:
+            severity: 'warning'
+    templates:
+      - /etc/alertmanager/config/*.tmpl
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts: 
+      - alertmanager.techsecom.net
+    tls: 
+    - secretName: alertmanager-general-tls
+      hosts:
+      - alertmanager.techsecom.net
+grafana:
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+      - grafana.techsecom.net
+    tls: 
+    - secretName: grafana-general-tls
+      hosts:
+      - grafana.techsecom.net
+prometheus:
+  enabled: true
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+      - prometheus.techsecom.net
+    tls: 
+      - secretName: prometheus-general-tls
+        hosts:
+          - prometheus.techsecom.net
+
+  prometheusSpec:
+    replicas: 3
+    storageSpec: 
+    volumeClaimTemplate:
+      spec:
+        storageClassName: longhorn
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 50Gi
+      selector: {}
+
