@@ -1,10 +1,10 @@
-
-global:
-  rbac:
-    create: true
+additionalPrometheusRulesMap: {}
 alertmanager:
-  enabled: true
-
+  alertmanagerSpec:
+    # configSecret: prometheus-msteams-webhook
+    clusterAdvertiseAddress: false
+    forceEnableClusterMode: true
+    replicas: 3
   config:
     global:
       resolve_timeout: 1m
@@ -99,109 +99,46 @@ alertmanager:
             severity: 'warning'
     templates:
       - /etc/alertmanager/config/*.tmpl
-
   ingress:
     enabled: true
     ingressClassName: nginx
     hosts: 
-    - alertmanager.techsecom.net
-    paths: []
-    # - /
+      - alertmanager.techsecom.net
     tls: 
     - secretName: alertmanager-general-tls
       hosts:
       - alertmanager.techsecom.net
-  alertmanagerSpec:
+grafana:
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+      - grafana.techsecom.net
+    tls: 
+    - secretName: grafana-general-tls
+      hosts:
+      - grafana.techsecom.net
+prometheus:
+  enabled: true
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+      - prometheus.techsecom.net
+    tls: 
+      - secretName: prometheus-general-tls
+        hosts:
+          - prometheus.techsecom.net
+
+  prometheusSpec:
     replicas: 3
-    storage: 
+    storageSpec: 
     volumeClaimTemplate:
       spec:
         storageClassName: longhorn
         accessModes: ["ReadWriteOnce"]
         resources:
           requests:
-            storage: 10Gi
-        selector: {}
-    nodeSelector: {}
-
-grafana:
-  enabled: true
-
-  defaultDashboardsTimezone: utc
-
-  adminPassword: 39djh102932@#d
-
-  rbac:
-  ingress:
-    enabled: true
-    ingressClassName: nginx
-
-    annotations: {}
-      # kubernetes.io/ingress.class: nginx
-      # kubernetes.io/tls-acme: "true"
-    labels: {}
-    hosts:
-      - grafana.techsecom.net
-    path: /
-    tls: 
-    - secretName: grafana-general-tls
-      hosts:
-      - grafana.techsecom.net
-
-  sidecar:
-    dashboards:
-      enabled: true
-      label: grafana_dashboard
-      labelValue: "1"
-      # Allow discovery in all namespaces for dashboards
-      searchNamespace: ALL
-
-      ## Annotations for Grafana dashboard configmaps
-      ##
-      annotations: {}
-      multicluster:
-        global:
-          enabled: false
-        etcd:
-          enabled: false
-      provider:
-        allowUiUpdates: false
-    datasources:
-      enabled: true
-      httpMethod: POST
-      createPrometheusReplicasDatasources: false
-      label: grafana_datasource
-      labelValue: "1"
-
-prometheus:
-  enabled: true
-  ingress:
-    enabled: true
-    ingressClassName: nginx
-    # servicePort: 8081
-    hosts:
-      - prometheus.techsecom.net
-    paths: []
-    # - /
-    # pathType: ImplementationSpecific
-    tls: []
-      - secretName: prometheus-general-tls
-        hosts:
-          - prometheus.techsecom.net
-  prometheusSpec:
-    replicas: 3
-    storageSpec: 
-     volumeClaimTemplate:
-       spec:
-         storageClassName: longhorn
-         accessModes: ["ReadWriteOnce"]
-         resources:
-           requests:
-             storage: 30Gi
-       selector: {}
-
-    ## Using tmpfs volume
-    ##
-    #  emptyDir:
-    #    medium: Memory
+            storage: 50Gi
+      selector: {}
 
